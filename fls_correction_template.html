@@ -1197,6 +1197,22 @@ textarea { resize: vertical; min-height: 56px; }
     });
   }
 
+  function homeAwaySegHTML(segId) {
+    return '<div class="seg small team-seg" id="' + segId + '">' +
+      '<button data-val="home" class="active" type="button">' + currentHomeName() + '</button>' +
+      '<button data-val="away" type="button">' + currentAwayName() + '</button>' +
+      '</div>';
+  }
+
+  function teamOrBothSegHTML(segId) {
+    return '<div class="row"><label>チーム</label>' +
+      '<div class="seg small" id="' + segId + '">' +
+      '<button data-val="home" class="active" type="button">' + currentHomeName() + '</button>' +
+      '<button data-val="away" type="button">' + currentAwayName() + '</button>' +
+      '<button data-val="both" type="button">両チーム</button>' +
+      '</div></div>';
+  }
+
   function rosterPickerHTML(baseCls, rel, specialValue, teamSegId, fixedTeam) {
     return '<span class="roster-picker">' +
       '<input type="hidden" class="mono roster-select ' + baseCls + '-select" id="' + baseCls + '-select" data-roster-rel="' + rel + '"' +
@@ -1235,7 +1251,7 @@ textarea { resize: vertical; min-height: 56px; }
     });
   }
 
-  var SPECIAL_PLAYER_VALUES = ['アシストなし', 'チームリバウンド', 'スティールなし', '相手なし'];
+  var SPECIAL_PLAYER_VALUES = ['アシストなし', 'チームリバウンド', 'スティールなし', '相手なし', 'ブロックなし'];
   function fmtPlayer(v) {
     if (!v) return '';
     return SPECIAL_PLAYER_VALUES.indexOf(v) !== -1 ? v : '#' + v;
@@ -1275,6 +1291,16 @@ textarea { resize: vertical; min-height: 56px; }
   }
   clockMinSel.value = '00';
   clockSecSel.value = '00';
+
+  function fillClockSelect(selectEl, isMinutes) {
+    var max = isMinutes ? 10 : 59;
+    for (var i = max; i >= 0; i--) {
+      var v = String(i).padStart(2, '0');
+      var opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      selectEl.appendChild(opt);
+    }
+  }
 
   function syncAfterClockDefault() {
     modAfterClockMinSel.value = clockMinSel.value;
@@ -1326,8 +1352,7 @@ textarea { resize: vertical; min-height: 56px; }
         b.classList.toggle('show', b.getAttribute('data-detail') === v);
       });
       var pSel = panelAPlayerWrap.querySelector('.panelAPlayer-select');
-      if (v === 'rebound') { pSel.dataset.specialValue = 'チームリバウンド'; }
-      else { delete pSel.dataset.specialValue; }
+      delete pSel.dataset.specialValue;
       panelAPlayerWrap.querySelector('label').textContent = subjectLabelFor(v);
       refreshAllRosterSelects();
       updatePanelAPlayerRequirement();
@@ -1401,8 +1426,7 @@ textarea { resize: vertical; min-height: 56px; }
       { key: 'player', label: 'シュートのアシスト選手', field: 'secondaryPlayer', fieldLabel: 'アシスト選手', rel: 'same' }
     ],
     block: [
-      { key: 'player', label: 'ブロックした選手(背番号)', field: 'primaryPlayer' },
-      { key: 'opponent', label: 'シュートした相手選手(背番号)', field: 'secondaryPlayer', fieldLabel: '相手選手', rel: 'opp' }
+      { key: 'player', label: 'ブロックした選手(背番号)', field: 'primaryPlayer' }
     ],
     foul: [
       { key: 'all', label: 'ファウル', field: 'foulFull' }
@@ -1506,7 +1530,7 @@ textarea { resize: vertical; min-height: 56px; }
     if (!def) return;
 
     if (def.field === 'primaryPlayer') {
-      var primarySpecial = modCategorySel.value === 'rebound' ? 'チームリバウンド' : '';
+      var primarySpecial = modCategorySel.value === 'rebound' ? 'チームリバウンド' : (modCategorySel.value === 'block' ? 'ブロックなし' : '');
       if (modCategorySel.value === 'rebound') {
         modFieldsContainer.innerHTML =
           '<div class="row two-col">' +
@@ -1528,10 +1552,53 @@ textarea { resize: vertical; min-height: 56px; }
         }
         setupSeg('modAfterPlayerTeamSeg', refreshAllRosterSelects);
       } else {
+        var blockReboundHTML = '';
+        if (modCategorySel.value === 'block') {
+          blockReboundHTML =
+            '<div class="row" style="margin-top:14px;">' +
+            '<button class="theme-toggle" id="modBlockReboundToggle" type="button">リバウンドも修正する</button>' +
+            '<div id="modBlockReboundInputs" style="display:none;margin-top:12px;">' +
+            '<p class="section-sub">修正前のリバウンド</p>' +
+            '<div class="row two-col">' +
+            '<div><label>チーム</label>' + homeAwaySegHTML('modBlockReboundBeforeTeamSeg') + '</div>' +
+            '<div><label for="modBlockReboundBeforePlayer-select">背番号</label>' + rosterPickerHTML('modBlockReboundBeforePlayer', 'same', 'チームリバウンド', 'modBlockReboundBeforeTeamSeg') + '</div>' +
+            '</div>' +
+            '<p class="section-sub" style="margin-top:14px;">修正後のリバウンド</p>' +
+            '<div class="row two-col">' +
+            '<div><label>チーム</label>' + homeAwaySegHTML('modBlockReboundAfterTeamSeg') + '</div>' +
+            '<div><label for="modBlockReboundAfterPlayer-select">背番号</label>' + rosterPickerHTML('modBlockReboundAfterPlayer', 'same', 'チームリバウンド', 'modBlockReboundAfterTeamSeg') + '</div>' +
+            '</div>' +
+            '<div class="row" style="margin-top:14px;">' +
+            '<label>リバウンドの時間(ブロックとは別の時間)</label>' +
+            '<div class="clock-row">' +
+            '<select id="modBlockReboundClockMin"></select><span>:</span><select id="modBlockReboundClockSec"></select>' +
+            '</div>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+        }
         modFieldsContainer.innerHTML =
           '<div class="row"><label for="modAfterPlayer-select">修正後の背番号</label>' +
           rosterPickerHTML('modAfterPlayer', 'same', primarySpecial) +
-          '</div>';
+          '</div>' + blockReboundHTML;
+        if (modCategorySel.value === 'block') {
+          setupSeg('modBlockReboundBeforeTeamSeg', refreshAllRosterSelects);
+          setupSeg('modBlockReboundAfterTeamSeg', refreshAllRosterSelects);
+          var brClockMin = document.getElementById('modBlockReboundClockMin');
+          var brClockSec = document.getElementById('modBlockReboundClockSec');
+          fillClockSelect(brClockMin, true);
+          fillClockSelect(brClockSec, false);
+          brClockMin.value = clockMinSel.value;
+          brClockSec.value = clockSecSel.value;
+          var brToggle = document.getElementById('modBlockReboundToggle');
+          var brInputs = document.getElementById('modBlockReboundInputs');
+          var brOpen = false;
+          brToggle.addEventListener('click', function () {
+            brOpen = !brOpen;
+            brInputs.style.display = brOpen ? 'block' : 'none';
+            brToggle.textContent = brOpen ? 'リバウンド修正を閉じる' : 'リバウンドも修正する';
+          });
+        }
       }
     } else if (def.field === 'secondaryPlayer') {
       var secSpecial = def.fieldLabel === 'アシスト選手' ? 'アシストなし' : '';
@@ -1599,13 +1666,6 @@ textarea { resize: vertical; min-height: 56px; }
       wireMiniSeg('modMultiAfterResult');
       wireMiniSeg('modMultiBeforeFastbreak');
       wireMiniSeg('modMultiAfterFastbreak');
-    } else if (def.field === 'reboundType') {
-      var rOpts = '<option value="オフェンスリバウンド">オフェンスリバウンド</option><option value="ディフェンスリバウンド">ディフェンスリバウンド</option><option value="チームリバウンド">チームリバウンド</option>';
-      modFieldsContainer.innerHTML =
-        '<div class="row two-col">' +
-        '<div><label for="modBeforeReboundType">修正前の種類</label><select id="modBeforeReboundType">' + rOpts + '</select></div>' +
-        '<div><label for="modAfterReboundType">修正後の種類</label><select id="modAfterReboundType">' + rOpts + '</select></div>' +
-        '</div>';
     } else if (def.field === 'foulFull') {
       modFieldsContainer.innerHTML =
         '<div class="row two-col">' +
@@ -1667,12 +1727,7 @@ textarea { resize: vertical; min-height: 56px; }
       aTSel.addEventListener('change', function () { aTOther.style.display = aTSel.value === 'その他' ? 'block' : 'none'; });
     } else if (def.field === 'subInOutFull') {
       modFieldsContainer.innerHTML =
-        '<div class="row"><label>チーム</label>' +
-        '<div class="seg small" id="modSubTeamSeg">' +
-        '<button data-val="home" class="active" type="button">' + currentHomeName() + '</button>' +
-        '<button data-val="away" type="button">' + currentAwayName() + '</button>' +
-        '<button data-val="both" type="button">両チーム</button>' +
-        '</div></div>' +
+        teamOrBothSegHTML('modSubTeamSeg') +
         '<div id="modSubTeamsContainer"></div>';
       var subTeamsContainer = document.getElementById('modSubTeamsContainer');
       function subTeamBlockHTML(teamKey, teamLabel) {
@@ -1701,12 +1756,7 @@ textarea { resize: vertical; min-height: 56px; }
       renderSubTeams();
     } else if (def.field === 'onCourtFive') {
       modFieldsContainer.innerHTML =
-        '<div class="row"><label>チーム</label>' +
-        '<div class="seg small" id="modOnCourtTeamSeg">' +
-        '<button data-val="home" class="active" type="button">' + currentHomeName() + '</button>' +
-        '<button data-val="away" type="button">' + currentAwayName() + '</button>' +
-        '<button data-val="both" type="button">両チーム</button>' +
-        '</div></div>' +
+        teamOrBothSegHTML('modOnCourtTeamSeg') +
         '<div id="modOnCourtTeamsContainer"></div>';
       var onCourtContainer = document.getElementById('modOnCourtTeamsContainer');
       function onCourtTeamBlockHTML(teamKey, teamLabel) {
@@ -1755,6 +1805,7 @@ textarea { resize: vertical; min-height: 56px; }
     modFoulTargetRow.classList.toggle('show', modCategorySel.value === 'foul');
     var mSel = modPlayerWrap.querySelector('.modPlayer-select');
     if (modCategorySel.value === 'rebound') { mSel.dataset.specialValue = 'チームリバウンド'; }
+    else if (modCategorySel.value === 'block') { mSel.dataset.specialValue = 'ブロックなし'; }
     else { delete mSel.dataset.specialValue; }
     modPlayerWrap.querySelector('label').textContent = modSubjectLabelFor(modCategorySel.value);
     document.getElementById('modTurnoverBeforeExtra').style.display = (modCategorySel.value === 'turnover') ? '' : 'none';
@@ -1799,12 +1850,7 @@ textarea { resize: vertical; min-height: 56px; }
       return;
     }
     container.innerHTML =
-      '<div class="row"><label>チーム</label>' +
-      '<div class="seg small" id="panelASubTeamSeg">' +
-      '<button data-val="home" class="active" type="button">' + currentHomeName() + '</button>' +
-      '<button data-val="away" type="button">' + currentAwayName() + '</button>' +
-      '<button data-val="both" type="button">両チーム</button>' +
-      '</div></div>' +
+      teamOrBothSegHTML('panelASubTeamSeg') +
       '<div id="panelASubTeamsContainer"></div>';
     var subTeamsContainer = document.getElementById('panelASubTeamsContainer');
     function subTeamBlockHTML(teamKey, teamLabel) {
@@ -1998,8 +2044,24 @@ textarea { resize: vertical; min-height: 56px; }
           var afterTeam = getSegValue('modAfterPlayerTeamSeg') || team;
           afterTeamName = afterTeam === 'home' ? currentHomeName() : currentAwayName();
         }
-        lines.push('【' + correctionLabel + '】' + period + ' ' + clock + '　の' + def.label);
+        lines.push('【' + correctionLabel + '】' + period + ' ' + clock + '　の' + def.label.replace(/\(背番号\)/g, ''));
         lines.push(teamName + subject + ' → ' + clockPrefix + (afterTeamName !== teamName ? afterTeamName : '') + fmtPlayer(afterVal));
+        if (modCategorySel.value === 'block') {
+          var brAfterPlayer = getRosterVal(modFieldsContainer, 'modBlockReboundAfterPlayer');
+          if (brAfterPlayer) {
+            var rbBeforeTeam = getSegValue('modBlockReboundBeforeTeamSeg') || 'home';
+            var rbBeforeTeamName = rbBeforeTeam === 'home' ? currentHomeName() : currentAwayName();
+            var rbBeforePlayer = getRosterVal(modFieldsContainer, 'modBlockReboundBeforePlayer');
+            var rbBeforeText = rbBeforePlayer ? (rbBeforePlayer === 'チームリバウンド' ? rbBeforePlayer : rbBeforeTeamName + fmtPlayer(rbBeforePlayer)) : '指定なし';
+            var rbAfterTeam = getSegValue('modBlockReboundAfterTeamSeg') || 'home';
+            var rbAfterTeamName = rbAfterTeam === 'home' ? currentHomeName() : currentAwayName();
+            var rbAfterText = brAfterPlayer === 'チームリバウンド' ? brAfterPlayer : rbAfterTeamName + fmtPlayer(brAfterPlayer);
+            var rbClockMinEl = document.getElementById('modBlockReboundClockMin');
+            var rbClockSecEl = document.getElementById('modBlockReboundClockSec');
+            var rbClock = (rbClockMinEl && rbClockSecEl) ? (rbClockMinEl.value + ':' + rbClockSecEl.value) : clock;
+            lines.push('リバウンド(' + rbClock + '): ' + rbBeforeText + ' → ' + rbAfterText);
+          }
+        }
       } else if (def.field === 'turnoverFull') {
         var beforeOppTeamName = team === 'home' ? currentAwayName() : currentHomeName();
         var beforeTypeText = buildTurnoverText('modBefore');
@@ -2133,7 +2195,7 @@ textarea { resize: vertical; min-height: 56px; }
         }
       } else {
         var beforeText, afterText;
-        var aspectLabel = def.label;
+        var aspectLabel = def.label.replace(/\(背番号\)/g, '');
         if (def.field === 'secondaryPlayer') {
           beforeText = fmtPlayer(getRosterVal(modFieldsContainer, 'modBeforePlayer'));
           afterText = fmtPlayer(getRosterVal(modFieldsContainer, 'modAfterPlayer'));
@@ -2144,9 +2206,6 @@ textarea { resize: vertical; min-height: 56px; }
         } else if (def.field === 'scoreResult') {
           beforeText = val('modBeforeScoreResultOnly');
           afterText = val('modAfterScoreResultOnly');
-        } else if (def.field === 'reboundType') {
-          beforeText = val('modBeforeReboundType');
-          afterText = val('modAfterReboundType');
         } else if (def.field === 'shotStyleOnly') {
           beforeText = val('modBeforeShotStyleOnly') || '指定なし';
           afterText = val('modAfterShotStyleOnly') || '指定なし';
@@ -2452,7 +2511,6 @@ textarea { resize: vertical; min-height: 56px; }
     historyShowCount += 15;
     renderHistory();
   });
-
 
   function copyText(text, btn) {
     function done() {
