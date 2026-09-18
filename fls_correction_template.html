@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>修正依頼テンプレ作成</title>
+<title>修正依頼テンプレ作成(編集中)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700&family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
@@ -99,6 +99,18 @@ body {
   font-size: 22px;
   margin: 0;
   letter-spacing: 0.01em;
+}
+.wip-badge {
+  display: inline-block;
+  vertical-align: middle;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--away) 22%, transparent);
+  color: var(--away);
+  border: 1px solid color-mix(in srgb, var(--away) 45%, transparent);
 }
 .hero p {
   margin: 4px 0 0;
@@ -465,7 +477,7 @@ textarea { resize: vertical; min-height: 56px; }
 
   <div class="hero">
     <div>
-      <h1>修正依頼テンプレ作成</h1>
+      <h1>修正依頼テンプレ作成 <span class="wip-badge">編集中</span></h1>
       <p>映像確認で見つかった記録ミスを、現地に送るチャット文にすばやく整形します。</p>
     </div>
     <button class="theme-toggle" id="themeToggle" type="button">画面の色を切り替え</button>
@@ -738,6 +750,13 @@ textarea { resize: vertical; min-height: 56px; }
 
       <div class="panel content-panel-wrap show" id="modPanelWrap">
         <p class="section-label">訂正内容</p>
+        <div class="row">
+          <label for="modPasteInput">FLSのプレイバイプレイを貼り付けて自動入力(元の内容用)</label>
+          <textarea id="modPasteInput" placeholder="FLSのACTION LOGなどからコピーした、対象プレーを含む部分をそのまま貼り付け" rows="3"></textarea>
+          <button class="theme-toggle" id="modPasteBtn" type="button" style="margin-top:8px;">貼り付けた内容から自動入力</button>
+          <button class="theme-toggle" id="modPasteClearBtn" type="button" style="margin-top:8px;margin-left:6px;">削除</button>
+          <p class="section-sub" id="modPasteResult" style="margin-top:6px;"></p>
+        </div>
         <div class="row">
           <label for="modCategory">プレーの種類</label>
           <select id="modCategory">
@@ -2558,6 +2577,255 @@ textarea { resize: vertical; min-height: 56px; }
   copyBtn.addEventListener('click', function () {
     if (!currentText) return;
     copyText(currentText, copyBtn);
+  });
+
+  function clickSegButton(containerId, val) {
+    var container = document.getElementById(containerId);
+    if (!container) return false;
+    var btn = container.querySelector('button[data-val="' + val + '"]');
+    if (btn) { btn.click(); return true; }
+    return false;
+  }
+
+  function clickRosterPick(baseCls, val) {
+    var hidden = document.getElementById(baseCls + '-select');
+    if (!hidden) return false;
+    var picker = hidden.closest('.roster-picker');
+    if (!picker) return false;
+    var grid = picker.querySelector('.roster-picker-grid');
+    var btn = grid ? grid.querySelector('button[data-val="' + val + '"]') : null;
+    if (btn) { btn.click(); return true; }
+    return false;
+  }
+
+  var SHOT_STYLE_MATCHERS = [
+    ['プットバックダンク', 'プットバックダンク'],
+    ['プットバックティップイン', 'プットバックティップイン'],
+    ['アリウープダンク', 'アリウープダンク'],
+    ['アリウープレイアップ', 'アリウープレイアップ'],
+    ['ドライビングレイアップ', 'ドライビングレイアップ'],
+    ['リバースレイアップ', 'リバースレイアップ'],
+    ['ユーロステップ', 'ユーロステップ'],
+    ['フックショット', 'フックショット'],
+    ['フローティングジャンプショット', 'フローティングジャンプショット'],
+    ['フェイドアウェイジャンプショット', 'フェイドアウェイジャンプショット'],
+    ['ターンアラウンドジャンプショット', 'ターンアラウンドジャンプショット'],
+    ['ステップバックジャンプショット', 'ステップバックジャンプショット'],
+    ['プルアップジャンプショット', 'プルアップジャンプショット'],
+    ['レイアップ', 'レイアップ'],
+    ['ダンク', 'ダンク'],
+    ['ジャンプショット', 'ジャンプシュート']
+  ];
+  function matchShotStyle(desc) {
+    for (var i = 0; i < SHOT_STYLE_MATCHERS.length; i++) {
+      if (desc.indexOf(SHOT_STYLE_MATCHERS[i][0]) !== -1) return SHOT_STYLE_MATCHERS[i][1];
+    }
+    return '';
+  }
+
+  var FOUL_TYPE_LIST = ['シューティングファウル', 'パーソナルファウル', 'オフェンスファウル', 'スローインファウル', 'テクニカルファウル', 'アンスポーツマンライクファウル', 'ディスクォリファイングファウル'];
+  function matchFoulType(desc) {
+    for (var i = 0; i < FOUL_TYPE_LIST.length; i++) {
+      if (desc.indexOf(FOUL_TYPE_LIST[i]) !== -1) return FOUL_TYPE_LIST[i];
+    }
+    return '';
+  }
+
+  var TURNOVER_TYPE_MATCHERS = [
+    ['バッドパス', 'バッドパス'],
+    ['ボールハンドリング', 'ボールハンドリング/ファンブル'],
+    ['ファンブル', 'ボールハンドリング/ファンブル'],
+    ['アウトオブバウンズ', 'アウトオブバウンズ'],
+    ['トラベリング', 'トラベリング'],
+    ['3秒バイオレーション', '3秒バイオレーション'],
+    ['5秒バイオレーション', '5秒バイオレーション'],
+    ['8秒バイオレーション', '8秒バイオレーション'],
+    ['ショットクロックバイオレーション', 'ショットクロックバイオレーション'],
+    ['24秒', 'ショットクロックバイオレーション'],
+    ['バックコートバイオレーション', 'バックコートバイオレーション'],
+    ['オフェンスゴールテンディング', 'オフェンスゴールテンディング'],
+    ['オフェンスファウル', 'オフェンスファウル'],
+    ['ダブルドリブル', 'ダブルドリブル'],
+    ['キャリング', 'キャリング/パーミング'],
+    ['パーミング', 'キャリング/パーミング']
+  ];
+  function matchTurnoverType(desc) {
+    for (var i = 0; i < TURNOVER_TYPE_MATCHERS.length; i++) {
+      if (desc.indexOf(TURNOVER_TYPE_MATCHERS[i][0]) !== -1) return TURNOVER_TYPE_MATCHERS[i][1];
+    }
+    return '';
+  }
+
+  function hasGenuineTurnoverKeyword(desc) {
+    var idx = desc.indexOf('ターンオーバー');
+    while (idx !== -1) {
+      if (desc.substring(Math.max(0, idx - 2), idx) !== 'オフ') return true;
+      idx = desc.indexOf('ターンオーバー', idx + 1);
+    }
+    return false;
+  }
+
+  var CATEGORY_LABELS = {
+    score: 'シュート', foul: 'ファウル', turnover: 'ターンオーバー', rebound: 'リバウンド',
+    block: 'ブロックショット', assist: 'アシスト', timeout: 'タイムアウト', substitution: '選手交代'
+  };
+
+  function parsePlayByPlayText(text) {
+    var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+
+    var actionIdx = -1, jersey = '', desc = '';
+    for (var i = 0; i < lines.length; i++) {
+      var m = /^#(\d+)\s+\S+\s+(.+)$/.exec(lines[i]);
+      if (m) { actionIdx = i; jersey = m[1]; desc = lines[i]; break; }
+      if (/^(オフィシャルタイムアウト|タイムアウト)$/.test(lines[i])) { actionIdx = i; jersey = ''; desc = lines[i]; break; }
+    }
+    if (actionIdx === -1) return null;
+
+    var clock = null;
+    for (var w = 0; w <= 10 && !clock; w++) {
+      var candidates = w === 0 ? [actionIdx] : [actionIdx + w, actionIdx - w];
+      for (var k = 0; k < candidates.length; k++) {
+        var idx = candidates[k];
+        if (idx >= 0 && idx < lines.length) {
+          var cm = /^(\d{1,2}):(\d{2})$/.exec(lines[idx]);
+          if (cm) { clock = { min: cm[1].length < 2 ? ('0' + cm[1]) : cm[1], sec: cm[2] }; break; }
+        }
+      }
+    }
+
+    var homeRoster = rosterData.home || [];
+    var awayRoster = rosterData.away || [];
+    var team = null;
+    if (homeRoster.indexOf(jersey) !== -1) team = 'home';
+    else if (awayRoster.indexOf(jersey) !== -1) team = 'away';
+    if (desc === 'オフィシャルタイムアウト') team = 'official';
+
+    var category = null;
+    var detail = {};
+    if (hasGenuineTurnoverKeyword(desc)) {
+      category = 'turnover';
+      detail.turnoverType = matchTurnoverType(desc);
+    } else if (/パーソナルファウル|シューティングファウル|オフェンスファウル|スローインファウル|テクニカルファウル|アンスポーツマンライクファウル|ディスクォリファイングファウル/.test(desc)) {
+      category = 'foul';
+      detail.foulType = matchFoulType(desc);
+    } else if (desc.indexOf('フリースロー') !== -1) {
+      category = 'score';
+      detail.position = 'FT';
+      detail.made = desc.indexOf('○') !== -1;
+    } else if (desc.indexOf('3Pシュート') !== -1) {
+      category = 'score';
+      detail.position = '3P';
+      detail.made = desc.indexOf('○') !== -1;
+      detail.style = matchShotStyle(desc);
+    } else if (desc.indexOf('2Pシュート') !== -1) {
+      category = 'score';
+      detail.position = desc.indexOf('インサイドペイント') !== -1 ? 'ペイント内' : '2P';
+      detail.made = desc.indexOf('○') !== -1;
+      detail.style = matchShotStyle(desc);
+    } else if (desc.indexOf('バスケットカウント') !== -1) {
+      category = 'score';
+      detail.made = true;
+    } else if (desc.indexOf('ブロックショット') !== -1) {
+      category = 'block';
+    } else if (desc.indexOf('オフェンスリバウンド') !== -1 || desc.indexOf('ディフェンスリバウンド') !== -1) {
+      category = 'rebound';
+    } else if (desc.indexOf('アシスト') !== -1) {
+      category = 'assist';
+    } else if (desc.indexOf('プレイヤーイン') !== -1 || desc.indexOf('プレイヤーアウト') !== -1) {
+      category = 'substitution';
+    } else if (desc.indexOf('タイムアウト') !== -1) {
+      category = 'timeout';
+    }
+
+    if (!category) return null;
+    detail.fastbreak = desc.indexOf('ファストブレイク') !== -1;
+
+    return { jersey: jersey, team: team, clock: clock, category: category, detail: detail };
+  }
+
+  function applyParsedPlay(parsed) {
+    modCategorySel.value = parsed.category;
+    renderModAspectOptions();
+
+    if (parsed.category === 'score') {
+      clickSegButton('modAspectSeg', 'multiple');
+    }
+
+    if (parsed.team && parsed.category !== 'timeout') {
+      clickSegButton('modTeamSeg', parsed.team);
+    }
+
+    if (parsed.category === 'timeout' && parsed.team) {
+      clickSegButton('modTimeoutTeamSeg', parsed.team);
+    }
+
+    if (parsed.clock) {
+      clockMinSel.value = parsed.clock.min;
+      clockSecSel.value = parsed.clock.sec;
+      if (!modAfterClockOpen) syncAfterClockDefault();
+    }
+
+    if (parsed.jersey && parsed.team && parsed.category !== 'timeout') {
+      clickRosterPick('modPlayer', parsed.jersey);
+    }
+
+    if (parsed.category === 'score') {
+      if (parsed.jersey && parsed.team) clickRosterPick('modMultiBeforePlayer', parsed.jersey);
+      if (parsed.detail.position) clickSegButton('modMultiBeforePositionSeg', parsed.detail.position);
+      if (parsed.detail.made !== undefined) clickSegButton('modMultiBeforeResultSeg', parsed.detail.made ? 'カウント' : 'アウト');
+      if (parsed.detail.style) {
+        var styleSel = document.getElementById('modMultiBeforeShotStyle');
+        if (styleSel) styleSel.value = parsed.detail.style;
+      }
+      if (parsed.detail.fastbreak) clickSegButton('modMultiBeforeFastbreakSeg', 'ファストブレイクあり');
+
+      // mirror before -> after, so only fields the user actually edits show up as a change
+      if (parsed.jersey && parsed.team) clickRosterPick('modMultiAfterPlayer', parsed.jersey);
+      if (parsed.detail.position) clickSegButton('modMultiAfterPositionSeg', parsed.detail.position);
+      if (parsed.detail.made !== undefined) clickSegButton('modMultiAfterResultSeg', parsed.detail.made ? 'カウント' : 'アウト');
+      if (parsed.detail.style) {
+        var afterStyleSel = document.getElementById('modMultiAfterShotStyle');
+        if (afterStyleSel) afterStyleSel.value = parsed.detail.style;
+      }
+      if (parsed.detail.fastbreak) clickSegButton('modMultiAfterFastbreakSeg', 'ファストブレイクあり');
+    } else if (parsed.category === 'foul' && parsed.detail.foulType) {
+      var fSel = document.getElementById('modBeforeFoulType');
+      if (fSel) fSel.value = parsed.detail.foulType;
+
+      if (parsed.team) clickSegButton('modFoulAfterTeamSeg', parsed.team);
+      if (parsed.jersey && parsed.team) clickRosterPick('modAfterFoulPlayer', parsed.jersey);
+      var afterFoulSel = document.getElementById('modAfterFoulType');
+      if (afterFoulSel) afterFoulSel.value = parsed.detail.foulType;
+    } else if (parsed.category === 'turnover' && parsed.detail.turnoverType) {
+      var tSel = document.getElementById('modBeforeTurnoverType');
+      if (tSel) tSel.value = parsed.detail.turnoverType;
+
+      if (parsed.team) clickSegButton('modTurnoverAfterTeamSeg', parsed.team);
+      if (parsed.jersey && parsed.team) clickRosterPick('modAfterTurnoverPlayer', parsed.jersey);
+      var afterTurnoverSel = document.getElementById('modAfterTurnoverType');
+      if (afterTurnoverSel) afterTurnoverSel.value = parsed.detail.turnoverType;
+    }
+  }
+
+  document.getElementById('modPasteBtn').addEventListener('click', function () {
+    var text = document.getElementById('modPasteInput').value;
+    var resultEl = document.getElementById('modPasteResult');
+    var parsed = parsePlayByPlayText(text);
+    if (!parsed) {
+      resultEl.textContent = 'プレー内容を認識できませんでした。手動で入力してください。';
+      return;
+    }
+    applyParsedPlay(parsed);
+    var parts = ['種類: ' + (CATEGORY_LABELS[parsed.category] || parsed.category)];
+    parts.push(parsed.team ? ('チーム: ' + (parsed.team === 'home' ? currentHomeName() : currentAwayName())) : 'チーム: 判定できず(手動で選択してください)');
+    if (parsed.jersey) parts.push('背番号: #' + parsed.jersey);
+    parts.push(parsed.clock ? ('時間: ' + parsed.clock.min + ':' + parsed.clock.sec) : '時間: 判定できず');
+    resultEl.textContent = '自動入力しました(' + parts.join(' / ') + ')。修正後の欄にも同じ内容を入れてあるので、間違っている項目だけ変更してください。';
+  });
+
+  document.getElementById('modPasteClearBtn').addEventListener('click', function () {
+    document.getElementById('modPasteInput').value = '';
+    document.getElementById('modPasteResult').textContent = '';
   });
 
   renderHistory();
